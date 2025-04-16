@@ -1,20 +1,72 @@
-﻿
-; This is currently only tested with utf-16
-; Methods have been tested to the extent demonstrated in the test file. The functions that consist
-; only of basic arithmetic are (should be...) working.
-; These following are known to be working, but I haven't written a full unit test and so
-; errors are still possible.
-; __Enum
-; Close
-; CloseView
-; OpenFile
-; OpenMapping
-; OpenViewP
-; OpenViewB
-; NextPage
-; Read
-; So basically every method except ReadPos is known to work with utf-16. ReadPos might work but it
-; requires a bit more attention.
+﻿/**
+
+    Current status of class: development
+    v0.0.1
+
+    Abbreviations
+    BMP - Basic Multilingual Plane
+
+    This is currently only tested with utf-16 using only characters in the BMP.
+
+    Validated methods (functions for which I've written a unit test and have completed debugging):
+        __Enum
+        OpenViewP
+        NextPage
+
+    Tested methods (functions that are working but need a unit test and/or more work)
+        OpenFile - Needs better error handling and handling of security options
+        OpenMapping - Same as above and also I need to write some methods for using the mapping for
+                    interprocess communication
+        OpenViewB - This has been debugged. Next step is to test its usage with `ReadPos`
+        Read - Has no current issues but work needs to be done to support all utf-16 and utf-8 characters.
+
+    Basic methods (simple functions that don't require special validation):
+        __New
+        BytesToPages
+        Close
+        CloseView
+        GetPageStartOffset
+        PagesToBytes
+        __Delete
+        __Initialize
+        __GetLargePageParam
+        __GetReadLength
+
+
+    Untested methods:
+        GetEncoding
+        ReadPos
+
+    Road Map:
+
+    1: Finish debugging and writing the unit tests
+
+    2: Basic support for inter-process communication
+        - hashing, signing, and encryption with microsoft's CNG api
+
+    3: Implement utf-8 support
+
+    4a: I've started learning some C++ and have written 4 dll functions and have a few more planned.
+    My end-goal for this class is to bridge AHK with compiled C++ code for very fast string
+    manipulation with the convenience of an AHK-based class. First project is a JSON parser.
+
+    My current AHK JSON parser {@link https://github.com/Nich-Cebolla/Stringify-ahk/blob/main/Parse.ahk}
+    can parse a 100Mb file in 25 seconds, which is 10 seconds slower than Thqby's
+    {@link https://github.com/thqby/ahk2_lib/blob/master/JSON.ahk}
+    and 8 seconds faster than TheArkive's {@link https://github.com/TheArkive/JXON_ahk2/blob/master/_JXON.ahk}
+    Javascript ran through the Chrome dev tools can parse the 100Mb string in under 5 seconds.
+    I'd like to see if I can get my parser to be around the speed of `JSON` while still exposing the
+    various options offered by my function.
+
+    4b: Wrappers for string dll calls for situations when convenience is a higher priority than optimization.
+
+    5: Ensure the class correctly handles characters outside of the BMP.
+
+    Things I don't plan to work on:
+    - Writing to file
+    - Other encodings
+
+*/
 
 
 /**
@@ -23,8 +75,8 @@
  * object created by AHK's native `FileOpen`, but this gives you more control over the amount of
  * memory consumed by the process.
  *
- * - Don't be alarmed by the long list of parameters. I included those only for flexibility for
- * people who need it. You can use this class by setting only two parameters.
+ * - Don't be alarmed by the long list of parameters. You can use this class by setting only two
+ * parameters.
  *
  * - To use a file mapping object for reading data from a file, follow these guidelines:
  *   - Set `Path` to the file path.
@@ -42,6 +94,7 @@
  * You will want to use the `IsLastIteration` variable to handle broken pieces of data while the
  * loop is processing. For each iteration except the last, you'll need a handler function to handle
  * broken pieces of data because views can only specify start offsets as multiples of the granularity.
+ * The unit test `utf16_2` illustrates this.
  *
  * - To use a file mapping object for inter-process communication, follow these guidelines:
  *   - Leave `Path` unset.
@@ -288,7 +341,7 @@ class FileMapping {
             return
         }
         if this.hFile {
-            throw TargetError('The file has already been opened.', -1)
+            throw ValueError('The file has already been opened.', -1)
         }
         if this.hFile := DllCall('CreateFile'
             , 'Str', this.Path
@@ -369,7 +422,7 @@ class FileMapping {
      *  MsgBox(Offset) ; FileMapping.VirtualMemoryGranularity
      *  MsgBox(Bytes) ; 20000
      *
-     *  Bytes := f.OpenViewB(&(Offset := 50000), 100000)
+     *  Bytes := f.OpenViewB(&(Offset := 50000), 100000, true) ; `true` to just do the calculations
      *  MsgBox(Offset) ; Floor(50000 / FileMapping.VirtualMemoryGranularity) * FileMapping.VirtualMemoryGranularity
      *  MsgBox(Bytes) ; 100000 + Mod(50000, FileMapping.VirtualMemoryGranularity)
      *  if Bytes > MyAppsMaxAvailableSpace {
@@ -389,20 +442,19 @@ class FileMapping {
      */
     OpenViewB(&Offset := 0, Bytes?, DontOpenView := false) {
         this.__Initialize()
-        if Offset + (Bytes ?? 0) > this.Size || (IsSet(Bytes) && this.Size + Bytes < 0) {
-            throw ValueError('The requested content exceeds the file`'s length.', -1, _Extra())
-        }
-        _Offset := Floor(Offset / FileMapping.VirtualMemoryGranularity) * FileMapping.VirtualMemoryGranularity
         if IsSet(Bytes) {
             if Bytes < 0 {
-                if this.Size + Bytes < _Offset {
+                if this.Size + Bytes < Offset {
                     throw ValueError('The input parameters are invalid.', -1, _Extra())
                 }
                 Bytes := this.Size + Bytes - Offset
+            } else if Offset + (Bytes ?? 0) > this.Size {
+                Bytes := this.Size - Offset
             }
         } else {
             Bytes := this.Size - Offset
         }
+        _Offset := Floor(Offset / FileMapping.VirtualMemoryGranularity) * FileMapping.VirtualMemoryGranularity
         Bytes += Offset - _Offset
         if !DontOpenView {
             if this.ptr := DllCall('MapViewOfFile'
@@ -431,16 +483,23 @@ class FileMapping {
      * a view that is opened at byte 0 is on page 0.
      * For ease of use, you can loop using `NextPage` to work through the entire file, or
      * call the object in a `for` loop to use the enumerator.
-     * @param {Integer} [Start=0] - The page number to start from. This is 0-based.
+     * @param {Integer} [Start=0] - The page number to start from. This is 0-based. If `Start` is
+     * the end of the file, the function returns -1.
      * @param {Integer} [Pages] - The number of pages to read. If unset, the remainder of the file
      * starting from `Start` is read. If set to a negative number, the number of pages to read
-     * is calculated from the end of the file.
-     * @returns {Integer} - The number of bytes used to create the view.
+     * is calculated from the end of the file. If Start + Pages exceeds the file size, `Pages`
+     * is truncated to the end of the file. If `Start` is the end of the file, the function returns
+     * -1.
+     * @returns {Integer} - The number of bytes used to create the view. If `Start` = the number
+     * of pages (i.e. the end of the file) the function returns -1.
      */
     OpenViewP(Start := 0, Pages?) {
         this.__Initialize()
+        if Start == this.Pages {
+            return -1
+        }
         if Start + (Pages ?? 1) > this.Pages || (IsSet(Pages) && Start + Pages < 0) {
-            throw ValueError('The requested content exceeds the file`'s length.', -1, _Extra())
+            Pages := this.Pages - Start
         }
         Offset := this.GetPageStartOffset(Start)
         if IsSet(Pages) {
@@ -477,7 +536,7 @@ class FileMapping {
     }
 
     /**
-     * @description - Returns the result from multiplying the input by the syste's virtual memory
+     * @description - Returns the result from multiplying the input by the system's virtual memory
      * granularity, which is considered by this library to be one page.
      * @param {Integer} Pages - The number of pages.
      * @returns {Integer} - `Pages * FileMapping.VirtualMemoryGranularity`.
@@ -487,10 +546,26 @@ class FileMapping {
     }
 
     /**
-     * @description - Closes the current view if opened, then then opens the next view of the file
-     *
+     * @description - Closes the current view if opened, then then opens the next view of the file.
+     * This returns the number of bytes used to create the view. This calculates the offest and
+     * byte count for you as a function of `MappingObj.Page` (which represents the end of the last
+     * page that was read), allowing you to use this in a loop to process a file's contents
+     * sequentially, without needing to do any calculations yourself. This does not require
+     * a view to already be opened; you can use this to initialize a view at page 0 and use it to
+     * loop an entire file.
+     * @param {Integer} [Pages] - The number of pages to use to open a view. One page is equivalent
+     * to the system virtual memory allocation granularity. The value of this is available from
+     * the class object `FileMapping.VirtualMemoryGranularity`. If unset, the remainder of the file
+     * starting from the current position is read.
+     * @returns {Integer} - The number of bytes used to open the view. When the view is opened up
+     * to the file's end, the number of byes will be `<size of the file> - <the view's start offset>`.
+     * In all other cases, the number of bytes will be `Pages * FileMapping.VirtualMemoryGranularity - 1`.
+     * The -1 is necessary because that byte belongs to the next page.
      */
     NextPage(Pages?) {
+        if !this.Pages {
+            return this.OpenViewP(0, Pages ?? unset)
+        }
         if this.Page >= this.Pages {
             return ''
         }
@@ -514,7 +589,7 @@ class FileMapping {
             throw ValueError('The requested content exceeds the file`'s length.', -1)
         }
         if !IsSet(Length) {
-            Length := InStr(this.Encoding, 'utf-16') ? Ceil(this.CurrentViewSize / 2) : this.CurrentViewSize
+            Length := this.__GetReadLength()
         }
         return StrGet(this.ptr + Offset, Length, this.Encoding)
     }
@@ -538,7 +613,7 @@ class FileMapping {
         }
         Pos := this.Pos
         if !IsSet(Length) {
-            Length := InStr(this.Encoding, 'utf-16') ? Ceil(this.CurrentViewSize / 2) : this.CurrentViewSize
+            Length := this.__GetReadLength()
         }
         this.Pos += Length
         return StrGet(this.ptr + Pos, Length, this.Encoding)
@@ -550,7 +625,7 @@ class FileMapping {
 
     __Enum(*) {
         if !this.EnumPageSize && !this.CurrentViewSize {
-            throw Error('To enumerate the file, either open a view with the desired size, or set ``obj.EnumPageSize`` to how many bytes you want to have per page.', -1)
+            throw Error('To enumerate the file, either open a view with the desired size, or set ``MappingObj.EnumPageSize`` to how many bytes you want to have per page.', -1)
         }
         EnumPageSize := this.EnumPageSize || this.CurrentViewSize
         EnumPageSize := Ceil(EnumPageSize / FileMapping.VirtualMemoryGranularity)
@@ -596,6 +671,10 @@ class FileMapping {
         return this.view_dwDesiredAccess ? this.view_dwDesiredAccess | 0x20000000 : 0x20000000
     }
 
+    __GetReadLength() {
+        return RegExMatch(this.Encoding, 'i)utf-16|cp1201|cp1200') ? Ceil(this.CurrentViewSize / 2) : this.CurrentViewSize
+    }
+
     LastPageSizeBytes => this.Size ? Mod(this.Size, FileMapping.VirtualMemoryGranularity) : 0
 
     OnExit {
@@ -609,6 +688,8 @@ class FileMapping {
         }
     }
 
+    OnLastPage => this.Page == this.Pages
+
     Pages => this.Size ? Ceil(this.Size / FileMapping.VirtualMemoryGranularity) : ''
 
     Pos {
@@ -620,6 +701,6 @@ class FileMapping {
             this.__Pos := Value < 0 ? this.CurrentViewSize + Value : Value
         }
     }
-
-    AtEoP => this.Pos == this.CurrentViewSize
+    /** @property {Boolean} FileMapping.Prototype.AtEoV - If the file pointer is at the end of the view. */
+    AtEoV => this.Pos == this.CurrentViewSize
 }
