@@ -83,7 +83,7 @@
  *   - Set `Encoding` to the file encoding.
  *   - You can leave everything else the default.
  *
- * - The interface is based on a "page" system, where 1 page = the virtual memory allocation
+ * - The implementation is based on a "page" system, where 1 page = the virtual memory allocation
  * granularity of your system. This class abstracts the details away, allowing you to work in terms
  * of pages instead of multiples of the granularity. You can enumerate the object using a standard
  * `for` loop, and you have up to four variables to work with from within the loop:
@@ -91,10 +91,12 @@
  *   - `ByteOffset` - The byte offset of the start of the view.
  *   - `ByteLength` - The number of bytes in the view.
  *   - `IsLastIteration` - A boolean indicating whether this is the last iteration of the loop.
- * You will want to use the `IsLastIteration` variable to handle broken pieces of data while the
+ * You will want to use the `IsLastIteration` variable to handle split pieces of data while the
  * loop is processing. For each iteration except the last, you'll need a handler function to handle
- * broken pieces of data because views can only specify start offsets as multiples of the granularity.
- * The unit test `utf16_2` illustrates this.
+ * split pieces of data because views can only specify start offsets as multiples of the granularity,
+ * which carries the consequence of being unable to specify a more natural end point for each page.
+ * The unit test `utf16_2` in the test script is a basic example of looping through a file,
+ * identifying where the page split, and putting the pieces back together.
  *
  * - To use a file mapping object for inter-process communication, follow these guidelines:
  *   - Leave `Path` unset.
@@ -112,7 +114,7 @@
  * built-in functions becomes noticeably slow. Reading the whole file into memory and working with
  * the StrPtr is one way to speed up the process, but now you have a whole file in memory and are
  * probably copying more of it into AHK object properties. This class provides a convenient
- * interface for handling very large files using AHK code without reading the whole file into memory.
+ * implementation for handling very large files using AHK code without reading the whole file into memory.
  * {@link https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingw}
  * - Regarding files, this should only be used for reading from a file; this doesn't support writing
  * to file at this time, though you can implement it yourself by modifying the bytes then calling
@@ -196,7 +198,7 @@ class FileMapping {
      * for inter-process communication, set this to the maximum size in bytes that you want to
      * allocate for the file mapping object.
      * @param {Integer} [view_dwDesiredAccess=0x0004] - The page protection for the file mapping
-     * object. When opening the object, If the requested size exceeds that of the system's
+     * object. When opening the object, if the requested size exceeds that of the system's
      * minimum large page size, the FILE_MAP_LARGE_PAGES is automatically added for you.
      * - One or more of these:
      *   - FILE_MAP_ALL_ACCESS 0xF001F
