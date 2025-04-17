@@ -1,41 +1,43 @@
 # FileMapping
 
 Current status of class: development
-v0.0.1
+
+-v0.0.1
 
 Abbreviations
-BMP - Basic Multilingual Plane
+
+-BMP: Basic Multilingual Plane
 
 This is currently only tested with utf-16 using only characters in the BMP.
 
 Validated methods (functions for which I've written a unit test and have completed debugging):
-    __Enum
-    OpenViewP
-    NextPage
+- __Enum
+- OpenViewP
+- NextPage
 
 Tested methods (functions that are working but need a unit test and/or more work)
-    OpenFile - Needs better error handling and handling of security options
-    OpenMapping - Same as above and also I need to write some methods for using the mapping for
-                interprocess communication
-    OpenViewB - This has been debugged. Next step is to test its usage with `ReadPos`
-    Read - Has no current issues but work needs to be done to support all utf-16 and utf-8 characters.
+- OpenFile - Needs better error handling and handling of security options
+- OpenMapping - Same as above and also I need to write some methods for using the mapping for
+- interprocess communication
+- OpenViewB - This has been debugged. Next step is to test its usage with `ReadPos`
+- Read - Has no current issues but work needs to be done to support all utf-16 and utf-8 characters.
 
 Basic methods (simple functions that don't require special validation):
-    __New
-    BytesToPages
-    Close
-    CloseView
-    GetPageStartOffset
-    PagesToBytes
-    __Delete
-    __Initialize
-    __GetLargePageParam
-    __GetReadLength
+- __New
+- BytesToPages
+- Close
+- CloseView
+- GetPageStartOffset
+- PagesToBytes
+- __Delete
+- __Initialize
+- __GetLargePageParam
+- __GetReadLength
 
 
 Untested methods:
-    GetEncoding
-    ReadPos
+- GetEncoding
+- ReadPos
 
 Road Map:
 
