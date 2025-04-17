@@ -2,11 +2,11 @@
 
 Current status of class: development
 
--v0.0.1
+- v0.0.1
 
 Abbreviations
 
--BMP: Basic Multilingual Plane
+- BMP: Basic Multilingual Plane
 
 This is currently only tested with utf-16 using only characters in the BMP.
 
@@ -44,7 +44,7 @@ Road Map:
 1: Finish debugging and writing the unit tests
 
 2: Basic support for inter-process communication
-    - hashing, signing, and encryption with microsoft's CNG api
+  - hashing, signing, and encryption with microsoft's CNG api
 
 3: Implement utf-8 support
 
@@ -52,10 +52,10 @@ Road Map:
 My end-goal for this class is to bridge AHK with compiled C++ code for very fast string
 manipulation with the convenience of an AHK-based class. First project is a JSON parser.
 
-My current AHK JSON parser {@link https://github.com/Nich-Cebolla/Stringify-ahk/blob/main/Parse.ahk}
+My current AHK JSON parser (https://github.com/Nich-Cebolla/Stringify-ahk/blob/main/Parse.ahk)
 can parse a 100Mb file in 25 seconds, which is 10 seconds slower than Thqby's
-{@link https://github.com/thqby/ahk2_lib/blob/master/JSON.ahk}
-and 8 seconds faster than TheArkive's {@link https://github.com/TheArkive/JXON_ahk2/blob/master/_JXON.ahk}
+(https://github.com/thqby/ahk2_lib/blob/master/JSON.ahk)
+and 8 seconds faster than TheArkive's (https://github.com/TheArkive/JXON_ahk2/blob/master/_JXON.ahk)
 Javascript ran through the Chrome dev tools can parse the 100Mb string in under 5 seconds.
 I'd like to see if I can get my parser to be around the speed of `JSON` while still exposing the
 various options offered by my function.
