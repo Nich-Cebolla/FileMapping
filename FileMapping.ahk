@@ -188,8 +188,8 @@ class FileMapping {
      *   - PAGE_WRITECOPY := 0x08
      * - Combined with one or more of the other values listed on the documentation.
      * {@link https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingw}
-     * @param {Integer} [map_lpFileMappingAttributes=0] - A pointer to a SECURITY_ATTRIBUTES structure that contains
-     * the security descriptor for the file mapping object.
+     * @param {Integer} [map_lpFileMappingAttributes=0] - A pointer to a SECURITY_ATTRIBUTES structure
+     * that contains the security descriptor for the file mapping object.
      * @param {Integer} [map_dwMaxSizeHigh=0] - The high-order 32 bits of the maximum size of the file
      * mapping object. This is ignored if the `Path` parameter is set. You can leave this at 0 in
      * any case.
@@ -256,8 +256,8 @@ class FileMapping {
     /**
      * @description - Returns the input divided by the system's virtual memory
      * allocation granularity, which is considered by this library to be one page.
-     * @param {Integer} Bytes - The number of bytes.
-     * @returns {Integer} - `Bytes / FileMapping.VirtualMemoryGranularity`.
+     * @param {Number} Bytes - The number of bytes.
+     * @returns {Number} - `Bytes / FileMapping.VirtualMemoryGranularity`.
      */
     BytesToPages(Bytes) {
         return Bytes / FileMapping.VirtualMemoryGranularity
@@ -372,8 +372,6 @@ class FileMapping {
         if this.hMapping {
             throw Error('The mapping has already been opened.', -1)
         }
-        ; Maximum size is 0 because it represents the maximum size of the file mapping object,
-        ; and does not represent the actual amount of memory consumed by the process.
         if !(this.hMapping := DllCall('CreateFileMapping'
             , 'ptr', this.hFile
             , 'ptr', this.map_lpFileMappingAttributes
@@ -575,13 +573,13 @@ class FileMapping {
     }
 
     /**
-     * @description - Reads from the file and does not advance the faux-pointer implemented by
+     * @description - Reads from the view and does not advance the file pointer implemented by
      * this class.
      * @param {Integer} [Offset=0] - The offset to read from.
      * @param {Integer} [Length] - The number of characters to read. If unset, the remainder of the
-     * file starting from `Offset` is read. This cannot be unset if the encoding is not "utf-16" or
+     * view starting from `Offset` is read. This cannot be unset if the encoding is not "utf-16" or
      * "utf-8", and if the buffer does not contain a null terminator.
-     * @returns {String} - The string read from the file.
+     * @returns {String} - The string read from the view.
      */
     Read(Offset := 0, Length?) {
         if !this.Encoding {
@@ -597,12 +595,9 @@ class FileMapping {
     }
 
     /**
-     * @description - Reads from the file and advances the faux-pointer implemented by this class.
-     * It's called a faux-pointer because its not an actual file pointer created using the Windows
-     * API; it's just a variable that is used to track the current position in the file when
-     * reading using this method.
+     * @description - Reads from the view and advances the file pointer implemented by this class.
      * @param {Integer} [Length] - The number of characters to read. If unset, the remainder of the
-     * file starting from the current position is read. This cannot be unset if the encoding is not
+     * view starting from the current position is read. This cannot be unset if the encoding is not
      * "utf-16" or "utf-8", and if the buffer does not contain a null terminator.
      * @returns {String} - The string read from the file.
      */
@@ -692,7 +687,7 @@ class FileMapping {
 
     OnLastPage => this.Page == this.Pages
 
-    Pages => this.Size ? Ceil(this.Size / FileMapping.VirtualMemoryGranularity) : ''
+    Pages => this.Size ? Ceil(this.Size / FileMapping.VirtualMemoryGranularity) : 0
 
     Pos {
         Get => this.__Pos
